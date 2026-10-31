@@ -85,6 +85,9 @@ input.amount{font-size:28px;font-weight:700}
 .note{font-size:14px;color:var(--muted);background:var(--soft);border-radius:14px;padding:12px;margin:10px 0}
 .gate{padding-top:12vh;text-align:center}
 .gate p{color:var(--muted)}
+.setup{margin-top:40px;text-align:left;border-top:1px solid var(--line);padding-top:18px}
+.setup h3{margin:0 0 6px;font-size:18px}
+.setup p{color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -92,6 +95,7 @@ input.amount{font-size:28px;font-weight:700}
 <div id="layer"></div>
 <script type="module">
 import * as C from "./core.js";
+import { seedData } from "./seed-data.js";
 
 const LS = { key: "tz_key", token: "tz_token", cache: "tz_cache" };
 const ls = {
@@ -151,11 +155,45 @@ function renderGate(msg = "") {
   $app.innerHTML = `<div class="gate"><h1>Витрати</h1>
     <p>${msg ? esc(msg) + "<br>" : ""}Відкрий застосунок за посиланням, яке тобі надіслали, або встав його сюди.</p>
     <input id="link" placeholder="Встав посилання" autocomplete="off">
-    <div class="actions"><button class="btn" id="go">Відкрити</button></div></div>`;
+    <div class="actions"><button class="btn" id="go">Відкрити</button></div>
+    <div class="setup"><h3>Перший запуск</h3>
+    <p>Записів ще немає? Встав ключ керування з GitHub. Застосунок створить записи й покаже посилання для входу.</p>
+    <input id="setup-token" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+    <div class="err" id="setup-err" role="alert"></div>
+    <div class="actions"><button class="btn ghost" id="setup">Створити записи</button></div></div></div>`;
   document.getElementById("go").onclick = () => {
     const m = document.getElementById("link").value.match(/k=([A-Za-z0-9_-]{43})/);
     if (!m) { alert("У посиланні немає ключа. Скопіюй посилання повністю."); return; }
     ls.set(LS.key, m[1]); state.key = m[1]; load();
+  };
+  document.getElementById("setup").onclick = async (ev) => {
+    const btn = ev.currentTarget, err = document.getElementById("setup-err");
+    const tok = document.getElementById("setup-token").value.trim();
+    btn.disabled = true; err.textContent = "";
+    try {
+      if (!(await C.checkToken(tok))) throw new Error("Ключ не підходить або не має дозволу на зміну.");
+      const key = C.generateKeyString();
+      await C.createLedger({ version: 1, categories: seedData.categories, entries: [] }, key, tok);
+      ls.set(LS.token, tok); state.token = tok;
+      ls.set(LS.key, key); state.key = key;
+      load();
+      showLinkOnce(key);
+    } catch (e) {
+      err.textContent = e instanceof TypeError ? "Немає зв'язку з інтернетом. Спробуй ще раз" : e.message;
+      btn.disabled = false;
+    }
+  };
+}
+function showLinkOnce(key) {
+  const link = `${location.origin}${location.pathname}#k=${key}`;
+  const el = sheet(`<h3>Записи створено ${closeBtn}</h3>
+    <p>Ось посилання для входу. Скопіюй його зараз і збережи. Далі його можна знайти в меню «•••».</p>
+    <label for="l-link">Посилання</label><input id="l-link" readonly value="${esc(link)}">
+    <div class="actions"><button class="btn" id="l-copy">Скопіювати</button></div>`);
+  wireClose(el);
+  el.querySelector("#l-copy").onclick = async (ev) => {
+    try { await navigator.clipboard.writeText(link); ev.currentTarget.textContent = "Скопійовано"; }
+    catch { el.querySelector("#l-link").select(); }
   };
 }
 

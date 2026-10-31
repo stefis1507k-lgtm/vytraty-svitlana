@@ -100,3 +100,21 @@ test("прихід ділиться за джерелами, витрати не
   assert.equal(s.byCategory["income-ai"], undefined);
   assert.throws(() => c.applyOp(d, { kind: "addEntry", entry: { id: "x", type: "income", amountGrosz: 100, date: "2026-10-06", categoryId: "nope" } }));
 });
+
+test("перший запуск створює файл, а якщо він уже є — не перезаписує", async () => {
+  const k = c.generateKeyString();
+  const empty = { version: 1, categories: [], entries: [] };
+  const puts = [];
+  const created = async (url, opts = {}) => {
+    if (!opts.method) return { ok: false, status: 404 };
+    puts.push(JSON.parse(opts.body));
+    return { ok: true, json: async () => ({ content: { sha: "s1" } }) };
+  };
+  await c.createLedger(empty, k, "t", created);
+  assert.equal(puts.length, 1);
+  assert.equal(puts[0].sha, undefined);
+  assert.deepEqual(await c.decryptData(c.utf8b64.to(puts[0].content), k), empty);
+
+  const exists = async () => ({ ok: true, json: async () => ({}) });
+  await assert.rejects(c.createLedger(empty, k, "t", exists), /вже створено/);
+});

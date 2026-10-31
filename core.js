@@ -197,6 +197,14 @@ export async function commitOp(op, keyString, token, fetchImpl = fetch) {
   throw new Error("Не збережено: дані змінилися. Спробуй ще раз");
 }
 
+// Перший запуск: створює зашифрований файл із записами. Якщо файл уже є — нічого не перезаписує.
+export async function createLedger(data, keyString, token, fetchImpl = fetch) {
+  const existing = await fetchImpl(`${API}${REPO.dataPath}?ref=${REPO.branch}`, { headers: ghHeaders(token), cache: "no-store" });
+  if (existing.ok) throw new Error("Записи вже створено. Скористайся посиланням для входу");
+  const r = await putFile(REPO.dataPath, utf8b64.from(await encryptData(data, keyString)), "Створення записів", token, null, fetchImpl);
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "Немає дозволу на зміну. Перевір ключ керування" : `Не створено (${r.status})`);
+}
+
 export async function uploadPhoto(path, base64Jpeg, token, fetchImpl = fetch) {
   const r = await putFile(path, base64Jpeg, "Фото категорії", token, null, fetchImpl);
   if (!r.ok) throw new Error(`Фото не завантажено (${r.status})`);
