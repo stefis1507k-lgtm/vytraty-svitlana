@@ -20,6 +20,38 @@ test("від'ємний баланс показується зі знаком �
   assert.equal(c.formatPln(0), "0,00 zł");
 });
 
+test("залишок на початок додається до балансу, але не до доходів і витрат місяця", () => {
+  const entries = [{ id: "i", type: "income", amountGrosz: 10000, date: "2026-11-02", categoryId: null }];
+  assert.equal(c.calculateBalance(entries, 100000), 110000);
+  assert.equal(c.calculateBalance(entries), 10000);
+  const s = c.summarizeMonth(entries, "2026-11");
+  assert.equal(s.income, 10000);
+  assert.equal(s.purchases, 0);
+});
+
+test("витрати діляться на «на бізнес» і «на життя»", () => {
+  const categories = [
+    { id: "groceries", name: "Продукти", order: 1, hidden: false },
+    { id: "business-investments", name: "Інвестиції в бізнес", order: 2, hidden: false },
+  ];
+  let d = { categories, entries: [] };
+  d = c.applyOp(d, { kind: "addEntry", entry: { id: "p1", type: "purchase", amountGrosz: 2000, date: "2026-11-03", categoryId: "groceries", note: "" } });
+  d = c.applyOp(d, { kind: "addEntry", entry: { id: "p2", type: "purchase", amountGrosz: 7000, date: "2026-11-04", categoryId: "business-investments", note: "" } });
+  const s = c.summarizeMonth(d.entries, "2026-11");
+  assert.equal(s.purchases, 9000);
+  assert.equal(s.living, 2000);
+  assert.equal(s.business, 7000);
+});
+
+test("залишок на початок зберігається в даних і можна його змінити", () => {
+  let d = { categories: [], entries: [] };
+  d = c.applyOp(d, { kind: "setOpening", grosz: 100000 });
+  assert.equal(d.openingGrosz, 100000);
+  d = c.applyOp(d, { kind: "setOpening", grosz: 0 });
+  assert.equal(d.openingGrosz, 0);
+  assert.throws(() => c.applyOp(d, { kind: "setOpening", grosz: 10.5 }));
+});
+
 test("початкові дані: баланс 319 zł, продукти за жовтень 382 zł", { skip: "чекає на стартові дані" }, () => {
   assert.equal(c.calculateBalance(seedData.entries), 31900);
   const s = c.summarizeMonth(seedData.entries, "2026-10");

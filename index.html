@@ -199,7 +199,7 @@ function showLinkOnce(key) {
 
 function render() {
   const d = state.data;
-  const balance = C.calculateBalance(d.entries);
+  const balance = C.calculateBalance(d.entries, d.openingGrosz ?? 0);
   const sum = C.summarizeMonth(d.entries, state.month);
   const incomeView = state.view === "income";
   const byCat = incomeView ? sum.incomeByCategory : sum.byCategory;
@@ -221,6 +221,7 @@ function render() {
   <div class="seg"><button data-view="home" class="${incomeView ? "" : "on"}">Витрати</button><button data-view="income" class="${incomeView ? "on" : ""}">ДОХОДИ</button></div>
   <div class="month"><div><h1>${C.monthLabel(state.month)}</h1><div class="total">${incomeView ? "Доходи за місяць" : "Витрати за місяць"}<b>${C.formatPln(incomeView ? sum.income : sum.purchases, { sign: false })}</b></div></div>
     <div class="arrows"><button class="iconbtn" id="prev" aria-label="Попередній місяць">‹</button><button class="iconbtn" id="next" aria-label="Наступний місяць">›</button></div></div>
+  ${incomeView ? "" : `<div class="total">на життя<b style="font-size:16px">${C.formatPln(sum.living, { sign: false })}</b> · на бізнес<b style="font-size:16px">${C.formatPln(sum.business, { sign: false })}</b></div>`}
   <section class="cats">${cats.map((c) => `<button class="cat ${state.filter === c.id ? "on" : ""} ${c.image ? "" : "plain"}" data-cat="${esc(c.id)}" style="background-image:url('${esc(C.imageUrl(c.image))}')">
     <span><span style="position:static;display:block"><b>${esc(c.name)}</b>${c.hidden ? `<div class="hid">прихована</div>` : ""}</span><i>${C.formatPln(byCat[c.id] ?? 0, { sign: false })}</i></span></button>`).join("")}</section>
   <section class="hist"><h2>Історія ${state.filter ? `<button class="chip" id="unfilter">${esc(filterName)} ✕</button>` : ""}</h2>
@@ -303,17 +304,36 @@ function openMenu() {
   const el = sheet(`<h3>Меню ${closeBtn}</h3><div class="menu">
     <button id="m-reload">🔄 Оновити дані</button>
     ${isEditor() ? `<button id="m-cats">🗂 Керувати категоріями</button>` : ""}
+    ${isEditor() ? `<button id="m-opening">💰 Залишок на початок</button>` : ""}
     <button id="m-share">🔗 Скопіювати посилання для перегляду</button>
     <button id="m-edit">${isEditor() ? "🔓 Керування увімкнено на цьому телефоні" : "🔒 Увімкнути керування"}</button>
     </div><p class="note">Посилання для перегляду відкриває всі записи. Надсилай його лише Ані й Міші.</p>`);
   wireClose(el);
   el.querySelector("#m-reload").onclick = () => { close(); load(); };
   el.querySelector("#m-cats")?.addEventListener("click", openCategories);
+  el.querySelector("#m-opening")?.addEventListener("click", openOpeningBalance);
   el.querySelector("#m-share").onclick = async () => {
     const link = `${location.origin}${location.pathname}#k=${state.key}`;
     try { await navigator.clipboard.writeText(link); alert("Посилання скопійовано"); } catch { prompt("Скопіюй посилання:", link); }
   };
   el.querySelector("#m-edit").onclick = openEditorSetup;
+}
+
+// Залишок на початок: сума, з якої ти почала облік. Додається до загального залишку.
+function openOpeningBalance() {
+  const current = state.data.openingGrosz ?? 0;
+  const el = sheet(`<h3>Залишок на початок ${closeBtn}</h3>
+    <p class="note">Скільки грошей було на початку обліку. Цю суму буде додано до загального залишку, але не до доходів і витрат за місяць.</p>
+    <label for="o-amount">Сума, zł</label><input id="o-amount" class="amount" inputmode="decimal" placeholder="0,00" value="${current ? C.formatPln(current, { sign: false }).replace(/\s|zł/g, "") : ""}">
+    <div class="err" id="o-err" role="alert"></div>
+    <div class="actions"><button class="btn" id="o-save">Зберегти</button></div>`);
+  wireClose(el);
+  const err = el.querySelector("#o-err");
+  el.querySelector("#o-save").onclick = async (ev) => {
+    let grosz;
+    try { grosz = C.toGrosz(el.querySelector("#o-amount").value); } catch (e) { err.textContent = e.message; return; }
+    if (await save({ kind: "setOpening", grosz }, ev.currentTarget, err)) close();
+  };
 }
 
 function openEditorSetup() {

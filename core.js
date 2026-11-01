@@ -20,9 +20,13 @@ export function formatPln(grosz, { sign = true } = {}) {
   return `${s}${zl},${String(abs % 100).padStart(2, "0")} zł`;
 }
 
-export function calculateBalance(entries) {
-  return entries.reduce((t, e) => t + (e.type === "income" ? e.amountGrosz : -e.amountGrosz), 0);
+// Залишок на початок задається окремо (поле openingGrosz у даних) і не рахується ні як дохід, ні як витрата.
+export function calculateBalance(entries, openingGrosz = 0) {
+  return openingGrosz + entries.reduce((t, e) => t + (e.type === "income" ? e.amountGrosz : -e.amountGrosz), 0);
 }
+
+// Категорія, витрати на яку — «на бізнес». Решта витрат — «на життя».
+export const BUSINESS_CATEGORY_ID = "business-investments";
 
 export function entriesOfMonth(entries, month) {
   return entries.filter((e) => e.date.startsWith(month));
@@ -30,7 +34,7 @@ export function entriesOfMonth(entries, month) {
 
 export function summarizeMonth(entries, month) {
   const byCategory = {}, incomeByCategory = {};
-  let purchases = 0, income = 0;
+  let purchases = 0, income = 0, business = 0, living = 0;
   for (const e of entriesOfMonth(entries, month)) {
     if (e.type === "income") {
       income += e.amountGrosz;
@@ -38,9 +42,11 @@ export function summarizeMonth(entries, month) {
     } else {
       purchases += e.amountGrosz;
       byCategory[e.categoryId] = (byCategory[e.categoryId] ?? 0) + e.amountGrosz;
+      if (e.categoryId === BUSINESS_CATEGORY_ID) business += e.amountGrosz;
+      else living += e.amountGrosz;
     }
   }
-  return { byCategory, incomeByCategory, purchases, income };
+  return { byCategory, incomeByCategory, purchases, income, business, living };
 }
 
 // Видимі на головному екрані: не приховані + приховані, що мають закупи в цьому місяці.
@@ -91,6 +97,11 @@ export function applyOp(data, op) {
     case "deleteEntry":
       d.entries = d.entries.filter((e) => e.id !== op.id);
       break;
+    case "setOpening": {
+      if (!Number.isInteger(op.grosz)) throw new Error("Некоректна сума залишку");
+      d.openingGrosz = op.grosz;
+      break;
+    }
     case "saveCategory": {
       const name = String(op.category.name ?? "").trim();
       if (!name) throw new Error("Вкажи назву категорії");
