@@ -43,6 +43,19 @@ test("витрати діляться на «на бізнес» і «на жи�
   assert.equal(s.business, 7000);
 });
 
+test("«Відклала» — окрема вбудована категорія, її витрати йдуть окремим підсумком", () => {
+  let d = { categories: [{ id: "groceries", name: "Продукти", order: 1, hidden: false }], entries: [] };
+  d = c.ensureBuiltinCategories(d);
+  d = c.ensureBuiltinCategories(d);
+  assert.equal(d.categories.filter((x) => x.id === c.SET_ASIDE_CATEGORY_ID).length, 1);
+  d = c.applyOp(d, { kind: "addEntry", entry: { id: "s1", type: "purchase", amountGrosz: 30000, date: "2026-11-05", categoryId: c.SET_ASIDE_CATEGORY_ID, note: "" } });
+  d = c.applyOp(d, { kind: "addEntry", entry: { id: "p1", type: "purchase", amountGrosz: 2000, date: "2026-11-05", categoryId: "groceries", note: "" } });
+  const s = c.summarizeMonth(d.entries, "2026-11");
+  assert.equal(s.saved, 30000);
+  assert.equal(s.living, 2000);
+  assert.equal(s.purchases, 32000);
+});
+
 test("залишок на початок зберігається в даних і можна його змінити", () => {
   let d = { categories: [], entries: [] };
   d = c.applyOp(d, { kind: "setOpening", grosz: 100000 });

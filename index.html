@@ -198,7 +198,7 @@ function showLinkOnce(key) {
 }
 
 function render() {
-  const d = state.data;
+  const d = C.ensureBuiltinCategories(state.data);
   const balance = C.calculateBalance(d.entries, d.openingGrosz ?? 0);
   const sum = C.summarizeMonth(d.entries, state.month);
   const incomeView = state.view === "income";
@@ -221,7 +221,7 @@ function render() {
   <div class="seg"><button data-view="home" class="${incomeView ? "" : "on"}">Витрати</button><button data-view="income" class="${incomeView ? "on" : ""}">ДОХОДИ</button></div>
   <div class="month"><div><h1>${C.monthLabel(state.month)}</h1><div class="total">${incomeView ? "Доходи за місяць" : "Витрати за місяць"}<b>${C.formatPln(incomeView ? sum.income : sum.purchases, { sign: false })}</b></div></div>
     <div class="arrows"><button class="iconbtn" id="prev" aria-label="Попередній місяць">‹</button><button class="iconbtn" id="next" aria-label="Наступний місяць">›</button></div></div>
-  ${incomeView ? "" : `<div class="total">на життя<b style="font-size:16px">${C.formatPln(sum.living, { sign: false })}</b> · на бізнес<b style="font-size:16px">${C.formatPln(sum.business, { sign: false })}</b></div>`}
+  ${incomeView ? "" : `<div class="total">на життя<b style="font-size:16px">${C.formatPln(sum.living, { sign: false })}</b> · на бізнес<b style="font-size:16px">${C.formatPln(sum.business, { sign: false })}</b> · відклала<b style="font-size:16px">${C.formatPln(sum.saved, { sign: false })}</b></div>`}
   <section class="cats">${cats.map((c) => `<button class="cat ${state.filter === c.id ? "on" : ""} ${c.image ? "" : "plain"}" data-cat="${esc(c.id)}" style="background-image:url('${esc(C.imageUrl(c.image))}')">
     <span><span style="position:static;display:block"><b>${esc(c.name)}</b>${c.hidden ? `<div class="hid">прихована</div>` : ""}</span><i>${C.formatPln(byCat[c.id] ?? 0, { sign: false })}</i></span></button>`).join("")}</section>
   <section class="hist"><h2>Історія ${state.filter ? `<button class="chip" id="unfilter">${esc(filterName)} ✕</button>` : ""}</h2>

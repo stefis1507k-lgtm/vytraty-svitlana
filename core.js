@@ -28,13 +28,22 @@ export function calculateBalance(entries, openingGrosz = 0) {
 // Категорія, витрати на яку — «на бізнес». Решта витрат — «на життя».
 export const BUSINESS_CATEGORY_ID = "business-investments";
 
+// Вбудована категорія «Відклала»: витрати, які відкладаються. Додається, якщо її ще немає.
+export const SET_ASIDE_CATEGORY_ID = "set-aside";
+export function ensureBuiltinCategories(data) {
+  if (data.categories.some((c) => c.id === SET_ASIDE_CATEGORY_ID)) return data;
+  const order = Math.max(0, ...data.categories.map((c) => c.order)) + 1;
+  data.categories.push({ id: SET_ASIDE_CATEGORY_ID, name: "Відклала", image: "", order, hidden: false, createdAt: new Date().toISOString() });
+  return data;
+}
+
 export function entriesOfMonth(entries, month) {
   return entries.filter((e) => e.date.startsWith(month));
 }
 
 export function summarizeMonth(entries, month) {
   const byCategory = {}, incomeByCategory = {};
-  let purchases = 0, income = 0, business = 0, living = 0;
+  let purchases = 0, income = 0, business = 0, living = 0, saved = 0;
   for (const e of entriesOfMonth(entries, month)) {
     if (e.type === "income") {
       income += e.amountGrosz;
@@ -43,10 +52,11 @@ export function summarizeMonth(entries, month) {
       purchases += e.amountGrosz;
       byCategory[e.categoryId] = (byCategory[e.categoryId] ?? 0) + e.amountGrosz;
       if (e.categoryId === BUSINESS_CATEGORY_ID) business += e.amountGrosz;
+      else if (e.categoryId === SET_ASIDE_CATEGORY_ID) saved += e.amountGrosz;
       else living += e.amountGrosz;
     }
   }
-  return { byCategory, incomeByCategory, purchases, income, business, living };
+  return { byCategory, incomeByCategory, purchases, income, business, living, saved };
 }
 
 // Видимі на головному екрані: не приховані + приховані, що мають закупи в цьому місяці.
@@ -79,7 +89,7 @@ export function validateEntry(input, categories) {
 }
 
 export function applyOp(data, op) {
-  const d = structuredClone(data);
+  const d = ensureBuiltinCategories(structuredClone(data));
   const now = new Date().toISOString();
   switch (op.kind) {
     case "addEntry": {
